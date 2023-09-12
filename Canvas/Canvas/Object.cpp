@@ -2,6 +2,13 @@
 
 namespace canvas
 {
+	Object::Object(D2D1_POINT_2F leftTop, D2D1_SIZE_F scale, ID2D1HwndRenderTarget* renderTarget)
+		: mLeftTop(leftTop)
+		, mScale(scale)
+	{
+		renderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &mLine);
+	}
+
 	Object::Object(int x, int y, int sX, int sY, ID2D1HwndRenderTarget* renderTarget)
 		: Object(
 			static_cast<float>(x),
@@ -14,21 +21,19 @@ namespace canvas
 	}
 
 	Object::Object(float x, float y, float sX, float sY, ID2D1HwndRenderTarget* renderTarget)
-		: mPos{ x, y }
-		, mScale{ sX, sY }
+		: Object({ x, y }, { sX, sY }, renderTarget)
 	{
-		renderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &mBrush);
 	}
 
 	Object::~Object()
 	{
-		mBrush->Release();
+		mLine->Release();
 	}
 
 
-	void Object::setBrushColor(D2D1::ColorF::Enum color)
+	void Object::setLineColor(D2D1::ColorF::Enum color)
 	{
-		assert(mBrush != nullptr);
-		mBrush->SetColor(D2D1::ColorF(color));
+		assert(mLine != nullptr);
+		mLine->SetColor(D2D1::ColorF(color));
 	}
 }

@@ -3,12 +3,17 @@
 namespace canvas
 {
 	App* App::mInstance = nullptr;
+	bool App::mbLButtonDown = false;
+	bool App::mbDrawing = false;
+	D2D1_POINT_2F App::mLeftTop = { -1, -1 };
+	D2D1_POINT_2F App::mRightBottom = { -1, -1 };
 
 	App::App()
 		: mHwnd(nullptr)
 		, mResolution{ 0, 0 }
 		, mD2DFactory(nullptr)
 		, mRenderTarget(nullptr)
+		, mBlackBrush(nullptr)
 	{
 		mObjects.reserve(DEFAULT_OBJECT_CAPACITY);
 	}
@@ -17,6 +22,7 @@ namespace canvas
 	{
 		SafeRelease(&mD2DFactory);
 		SafeRelease(&mRenderTarget);
+		SafeRelease(&mBlackBrush);
 
 		delete mInstance;
 
@@ -65,6 +71,7 @@ namespace canvas
 	{
 		SafeRelease(&mD2DFactory);
 		SafeRelease(&mRenderTarget);
+		SafeRelease(&mBlackBrush);
 	}
 
 	HRESULT App::createIndepentDeviceResource()
@@ -92,14 +99,14 @@ namespace canvas
 				D2D1::HwndRenderTargetProperties(mHwnd, size),
 				&mRenderTarget
 			);
+
+			if (SUCCEEDED(hr))
+			{
+				mRenderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &mBlackBrush);
+			}
 		}
 
 		return hr;
-	}
-
-	void App::addObject(int x, int y)
-	{
-		mObjects.push_back(new Object(x, y, 100, 100, mRenderTarget));
 	}
 
 	HRESULT App::onRender()
@@ -119,12 +126,12 @@ namespace canvas
 				{
 					mRenderTarget->DrawRectangle(
 						D2D1::RectF(
-							obj->mPos.x - obj->mScale.x / 2,
-							obj->mPos.y - obj->mScale.y / 2,
-							obj->mPos.x + obj->mScale.x / 2,
-							obj->mPos.y + obj->mScale.y / 2
+							obj->mLeftTop.x,
+							obj->mLeftTop.y,
+							obj->mLeftTop.x + obj->mScale.width,
+							obj->mLeftTop.y + obj->mScale.height
 						),
-						obj->mBrush
+						obj->mLine
 					);
 				}
 			}
@@ -138,6 +145,56 @@ namespace canvas
 		}
 
 		return hr;
+	}
+
+	HRESULT App::onRender(D2D1_RECT_F rect)
+	{
+		HRESULT hr = S_OK;
+
+		hr = createDeviceResources();
+
+		if (SUCCEEDED(hr))
+		{
+			mRenderTarget->BeginDraw();
+			{
+				mRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+				mRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+
+				mRenderTarget->DrawRectangle(rect, mBlackBrush);
+
+				for (auto obj : mObjects)
+				{
+					mRenderTarget->DrawRectangle(
+						D2D1::RectF(
+							obj->mLeftTop.x,
+							obj->mLeftTop.y,
+							obj->mLeftTop.x + obj->mScale.width,
+							obj->mLeftTop.y + obj->mScale.height
+						),
+						obj->mLine
+					);
+				}
+			}
+			hr = mRenderTarget->EndDraw();
+
+			if (hr == D2DERR_RECREATE_TARGET)
+			{
+				hr = S_OK;
+				discardDeviceResources();
+			}
+		}
+
+		return hr;
+	}
+
+	void App::addObject()
+	{
+		int width = mRightBottom.x - mLeftTop.x;
+		int height = mRightBottom.y - mLeftTop.y;
+
+		D2D1_SIZE_F size = { width, height };
+
+		mObjects.push_back(new Object(mLeftTop, size, mRenderTarget));
 	}
 
 	void App::Run()
@@ -161,17 +218,46 @@ namespace canvas
 			PostQuitMessage(0);
 			break;
 		case WM_PAINT:
-			mInstance->onRender();
+			if (mbLButtonDown && mRightBottom.x >= 0)
+			{
+				mInstance->onRender({ mLeftTop.x, mLeftTop.y, mRightBottom.x, mRightBottom.y });
+			}
+			else
+			{
+				mInstance->onRender();
+			}
 			break;
 		case WM_LBUTTONDOWN:
-		{
-			int mask = 0xFFFF;
-			int x = lParam & mask;
-			int y = (lParam >> 16) & mask;
+			assert(!mbLButtonDown);
+			mbLButtonDown = true;
 
-			mInstance->addObject(x, y);
-		}
-		break;
+			mLeftTop.x = LOWORD(lParam);
+			mLeftTop.y = HIWORD(lParam);
+			break;
+		case WM_MOUSEMOVE:
+			if (mbLButtonDown)
+			{
+				mbDrawing = true;
+				mRightBottom.x = LOWORD(lParam);
+				mRightBottom.y = HIWORD(lParam);
+
+				mInstance->onRender({ mLeftTop.x, mLeftTop.y, mRightBottom.x, mRightBottom.y });
+			}
+
+			break;
+		case WM_LBUTTONUP:
+			assert(mbLButtonDown);
+
+			if (mbDrawing)
+			{
+				mInstance->addObject();
+			}
+
+			mbLButtonDown = false;
+			mbDrawing = false;
+			mRightBottom.x = -1;
+			mRightBottom.y = -1;
+			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
