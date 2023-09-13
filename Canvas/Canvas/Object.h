@@ -11,17 +11,29 @@ namespace canvas
 	{
 		friend App;
 	public:
-		Object(D2D1_POINT_2F center, D2D1_SIZE_F scale, ID2D1HwndRenderTarget* renderTarget);
-		Object(int x, int y, int sX, int sY, ID2D1HwndRenderTarget* renderTarget);
-		Object(float x, float y, float sX, float sY, ID2D1HwndRenderTarget* renderTarget);
-		~Object();
-
+		Object(D2D1_POINT_2F leftTop, D2D1_SIZE_F scale, D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
+		~Object() = default;
+		Object(const Object& other) = default;
+		Object& operator=(const Object& rhs) = default;
+		
 	private:
-		void setLineColor(D2D1::ColorF::Enum color);
+		inline void setLineColor(D2D1::ColorF color);
+		inline void setBackGroundColor(D2D1::ColorF color);
 
 	private:
 		D2D1_POINT_2F mLeftTop;
 		D2D1_SIZE_F mScale;
-		ID2D1SolidColorBrush* mLine;
+		D2D1::ColorF mLineColor;
+		D2D1::ColorF mBackgroundColor;
 	};
+
+	inline void Object::setLineColor(D2D1::ColorF color)
+	{
+		mLineColor = color;
+	}
+
+	inline void Object::setBackGroundColor(D2D1::ColorF color)
+	{
+		mBackgroundColor = color;
+	}
 }

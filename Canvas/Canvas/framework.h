@@ -31,3 +31,21 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #endif
 
 #define DEFAULT_OBJECT_CAPACITY (256)
+
+enum class eMouseMode
+{
+	Select,
+	Rect,
+
+	Count
+};
+
+template<typename Interface>
+inline void SafeRelease(Interface** interfaceToRelease)
+{
+	if (*interfaceToRelease != nullptr)
+	{
+		(*interfaceToRelease)->Release();
+		*interfaceToRelease = nullptr;
+	}
+}

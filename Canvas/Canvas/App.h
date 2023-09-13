@@ -4,16 +4,6 @@
 
 namespace canvas
 {
-	template<typename Interface>
-	inline void SafeRelease(Interface** interfaceToRelease)
-	{
-		if (*interfaceToRelease != nullptr)
-		{
-			(*interfaceToRelease)->Release();
-			*interfaceToRelease = nullptr;
-		}
-	}
-
 	class App
 	{
 	public:
@@ -34,15 +24,17 @@ namespace canvas
 		void discardDeviceResources();
 
 		HRESULT onRender();
-		HRESULT onRender(D2D1_RECT_F rect);
+		HRESULT drawObject();
+		HRESULT drawNewObjectSize(D2D1_RECT_F objectRect);
+		HRESULT drawSelectedArea(D2D1_RECT_F selectedArea);
 		void addObject();
 
 	private:
 		static App* mInstance;
 		static bool mbLButtonDown;
-		static bool mbDrawing;
 		static D2D1_POINT_2F mLeftTop;
 		static D2D1_POINT_2F mRightBottom;
+		static eMouseMode mCurrMode;
 
 		HWND mHwnd;
 		POINT mResolution;
@@ -50,6 +42,9 @@ namespace canvas
 
 		ID2D1Factory* mD2DFactory;
 		ID2D1HwndRenderTarget* mRenderTarget;
-		ID2D1SolidColorBrush* mBlackBrush;
+
+		ID2D1SolidColorBrush* mObjectBrush;
+		ID2D1SolidColorBrush* mLineBrush;
+		ID2D1SolidColorBrush* mBackGroundBrush;
 	};
 }
