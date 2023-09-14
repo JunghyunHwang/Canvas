@@ -8,5 +8,9 @@ namespace canvas
 		, mLineColor(lineColor)
 		, mBackgroundColor(backgroundColor)
 	{
+		mRect.left = mLeftTop.x;
+		mRect.top = mLeftTop.y;
+		mRect.right = mLeftTop.x + mScale.width;
+		mRect.bottom = mLeftTop.y + mScale.height;
 	}
 }

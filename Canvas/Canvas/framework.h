@@ -31,10 +31,14 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #endif
 
 #define DEFAULT_OBJECT_CAPACITY (256)
+#define MAX_LOADSTRING 100
+#define SELECT_MARGIN (10)
+#define SELECTED_RECT_MARGIN (5)
 
 enum class eMouseMode
 {
 	Select,
+	Selected,
 	Rect,
 
 	Count
@@ -49,3 +53,4 @@ inline void SafeRelease(Interface** interfaceToRelease)
 		*interfaceToRelease = nullptr;
 	}
 }
+

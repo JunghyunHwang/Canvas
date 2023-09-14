@@ -19,10 +19,14 @@ namespace canvas
 	private:
 		inline void setLineColor(D2D1::ColorF color);
 		inline void setBackGroundColor(D2D1::ColorF color);
+		inline void setLeftTopPoint(D2D1_POINT_2F pos);
+		inline void setScale(D2D1_SIZE_F scale);
 
 	private:
 		D2D1_POINT_2F mLeftTop;
 		D2D1_SIZE_F mScale;
+		D2D1_RECT_F mRect;
+
 		D2D1::ColorF mLineColor;
 		D2D1::ColorF mBackgroundColor;
 	};
@@ -35,5 +39,19 @@ namespace canvas
 	inline void Object::setBackGroundColor(D2D1::ColorF color)
 	{
 		mBackgroundColor = color;
+	}
+
+	inline void Object::setLeftTopPoint(D2D1_POINT_2F pos)
+	{
+		mLeftTop = pos;
+		mRect.left = mLeftTop.x;
+		mRect.top = mLeftTop.y;
+		mRect.right = mLeftTop.x + mScale.width;
+		mRect.bottom = mLeftTop.y + mScale.height;
+	}
+
+	inline void Object::setScale(D2D1_SIZE_F scale)
+	{
+		mScale = scale;
 	}
 }

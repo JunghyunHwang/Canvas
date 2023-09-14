@@ -4,13 +4,11 @@
 #include "framework.h"
 #include "Canvas.h"
 
-#define MAX_LOADSTRING 100
-
 using namespace canvas;
 
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
-WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+WCHAR szWindowClass[MAX_LOADSTRING];
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -40,6 +38,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_CANVAS));
 
     app->Run();
+
+    app->Release();
 
     return 0;
 }
