@@ -27,11 +27,12 @@ namespace canvas
 		HRESULT onRender();
 		HRESULT drawObjects();
 		HRESULT drawNewObjectSize(D2D1_RECT_F objectRect);
-		HRESULT drawSelectedArea(D2D1_RECT_F selectedArea);
+		HRESULT drawDragSelection(D2D1_RECT_F selectedArea);
 
 		void addObject();
+		void moveSelectedObjects(int x, int y);
 		Object* getObjectOnCursor(int x, int y) const;
-		void setSelectedObjectsPoint(int x, int y);
+		int getSelectedObjectsBoundary(D2D1_RECT_F& out);
 		
 	private:
 		static App* mInstance;
@@ -40,11 +41,12 @@ namespace canvas
 		static D2D1_POINT_2F mEndPoint;
 		static eMouseMode mCurrMode;
 
+		static std::unordered_set<Object*> mObjects; 
+		static std::unordered_set<Object*> mSelectedObjects;
+		static Object* mSelectedObjectsArea;
+
 		HWND mHwnd;
 		POINT mResolution;
-		std::vector<Object*> mObjects;
-		std::vector<Object*> mSelectedObjects;
-		Object* mSelectedArea;
 
 		ID2D1Factory* mD2DFactory;
 		ID2D1HwndRenderTarget* mRenderTarget;

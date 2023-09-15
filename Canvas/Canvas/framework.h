@@ -17,6 +17,9 @@
 #include <wchar.h>
 #include <math.h>
 #include <vector>
+#include <unordered_set>
+#include <limits>
+#include <intrin.h>
 
 #include <d2d1.h>
 #include <d2d1helper.h>

@@ -1,5 +1,3 @@
-#include <cassert>
-
 #include "App.h"
 #include "framework.h"
 #include "Canvas.h"
