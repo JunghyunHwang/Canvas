@@ -20,18 +20,17 @@ namespace canvas
 		App(const App* other) = delete;
 		App& operator=(const App* rhs) = delete;
 
-		HRESULT createIndepentDeviceResource();
 		HRESULT createDeviceResources();
 		void discardDeviceResources();
 
-		HRESULT onRender();
 		HRESULT drawObjects();
 		HRESULT drawNewObjectSize(D2D1_RECT_F objectRect);
 		HRESULT drawDragSelection(D2D1_RECT_F selectedArea);
 
-		void addObject();
-		void moveSelectedObjects(int x, int y);
-		Object* getObjectOnCursor(int x, int y) const;
+		void addSelectedObject();
+		void removeSelectedObject();
+		void moveSelectedObjects(float x, float y);
+		Object* getObjectOnCursor(float x, float y) const;
 		int getSelectedObjectsBoundary(D2D1_RECT_F& out);
 		
 	private:

@@ -10,6 +10,7 @@ namespace canvas
 	{
 		friend App;
 	public:
+		Object();
 		Object(D2D1_POINT_2F leftTop, D2D1_POINT_2F rigthBottom, D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
 		~Object() = default;
 		Object(const Object& other) = default;
@@ -19,12 +20,9 @@ namespace canvas
 		inline void SetBackGroundColor(D2D1::ColorF color);
 		inline void SetLeftTopPoint(D2D1_POINT_2F pos);
 		inline void SetRightBottom(D2D1_POINT_2F pos);
-		inline void Move(int x, int y);
+		inline void Move(float x, float y);
 
 	private:
-		static uint32_t mCount;
-
-		uint32_t mID;
 		D2D1_POINT_2F mLeftTop;
 		D2D1_POINT_2F mRightBottom;
 
@@ -52,7 +50,7 @@ namespace canvas
 		mRightBottom = pos;
 	}
 
-	inline void Object::Move(int x, int y)
+	inline void Object::Move(float x, float y)
 	{
 		mLeftTop.x += x;
 		mLeftTop.y += y;

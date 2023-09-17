@@ -38,6 +38,8 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define SELECT_MARGIN (10)
 #define SELECTED_RECT_MARGIN (5)
 
+#define PRESSED(key) ((key) & 0x8000) > 0
+
 enum class eMouseMode
 {
 	Select,
@@ -56,4 +58,3 @@ inline void SafeRelease(Interface** interfaceToRelease)
 		*interfaceToRelease = nullptr;
 	}
 }
-
