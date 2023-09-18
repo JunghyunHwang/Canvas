@@ -1,12 +1,21 @@
+#include "pch.h"
 #include "Object.h"
 
 namespace canvas
 {
 	Object::Object()
-		: mLeftTop({ -1, -1 })
-		, mRightBottom({ 0, 0 })
+		: mLeftTop({ NONE_POINT, NONE_POINT })
+		, mRightBottom({ NONE_POINT, NONE_POINT })
 		, mLineColor(D2D1::ColorF::Black)
 		, mBackgroundColor(D2D1::ColorF(0, 0, 0, 0.f))
+	{
+	}
+
+	Object::Object(D2D1::ColorF lineColor, D2D1::ColorF backgroundColor)
+		: mLeftTop({ NONE_POINT, NONE_POINT })
+		, mRightBottom({ NONE_POINT, NONE_POINT })
+		, mLineColor(lineColor)
+		, mBackgroundColor(backgroundColor)
 	{
 	}
 

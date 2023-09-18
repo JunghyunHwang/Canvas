@@ -1,7 +1,5 @@
 #pragma once
 
-#include "framework.h"
-
 namespace canvas
 {
 	class App;
@@ -11,6 +9,7 @@ namespace canvas
 		friend App;
 	public:
 		Object();
+		Object(D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
 		Object(D2D1_POINT_2F leftTop, D2D1_POINT_2F rigthBottom, D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
 		~Object() = default;
 		Object(const Object& other) = default;

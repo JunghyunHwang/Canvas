@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "App.h"
 
 namespace canvas
@@ -8,7 +9,9 @@ namespace canvas
 	D2D1_POINT_2F App::mStartPoint = { -1, -1 };
 	D2D1_POINT_2F App::mEndPoint = { -1, -1 };
 
+	Object* App::mDragSelectionArea = nullptr;
 	Object* App::mSelectedObjectsArea = nullptr;
+	Object* App::mNewObjectArea = nullptr;
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
 
@@ -18,8 +21,6 @@ namespace canvas
 		, mD2DFactory(nullptr)
 		, mRenderTarget(nullptr)
 		, mObjectBrush(nullptr)
-		, mLineBrush(nullptr)
-		, mBackGroundBrush(nullptr)
 	{
 		mObjects.reserve(DEFAULT_OBJECT_CAPACITY);
 		mSelectedObjects.reserve(DEFAULT_OBJECT_CAPACITY);
@@ -31,8 +32,6 @@ namespace canvas
 		SafeRelease(&mRenderTarget);
 
 		SafeRelease(&mObjectBrush);
-		SafeRelease(&mLineBrush);
-		SafeRelease(&mBackGroundBrush);
 	}
 
 	App* App::GetInstance()
@@ -55,6 +54,8 @@ namespace canvas
 		}
 
 		delete mSelectedObjectsArea;
+		delete mDragSelectionArea;
+		delete mNewObjectArea;
 		delete mInstance;
 	}
 
@@ -69,7 +70,9 @@ namespace canvas
 		mHwnd = hWnd;
 		mResolution = resolution;
 
-		mSelectedObjectsArea = new Object({ -1, -1 }, { 0, 0 }, D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
+		mDragSelectionArea = new Object(D2D1::ColorF(0.f, 0.f, 0.f, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
+		mSelectedObjectsArea = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
+		mNewObjectArea = new Object();
 
 		RECT rt = { 0, 0, mResolution.x, mResolution.y };
 		AdjustWindowRect(&rt, WS_OVERLAPPEDWINDOW, true);
@@ -105,15 +108,13 @@ namespace canvas
 			if (SUCCEEDED(hr))
 			{
 				mRenderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &mObjectBrush);
-				mRenderTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &mLineBrush);
-				mRenderTarget->CreateSolidColorBrush(D2D1::ColorF(0x6495ED, 0.3f), &mBackGroundBrush);
 			}
 		}
 
 		return hr;
 	}
 
-	HRESULT App::drawObjects()
+	HRESULT App::render()
 	{
 		mRenderTarget->BeginDraw();
 		{
@@ -124,10 +125,7 @@ namespace canvas
 
 			for (auto obj : mObjects)
 			{
-				rect.left = obj->mLeftTop.x;
-				rect.top = obj->mLeftTop.y;
-				rect.right = obj->mRightBottom.x;
-				rect.bottom = obj->mRightBottom.y;
+				SET_RECT_BY_OBJ_POINTER(rect, obj);
 
 				mObjectBrush->SetColor(obj->mBackgroundColor);
 				mRenderTarget->FillRectangle(rect, mObjectBrush);
@@ -136,51 +134,26 @@ namespace canvas
 				mRenderTarget->DrawRectangle(rect, mObjectBrush);
 			}
 
-			if (mSelectedObjectsArea->mLeftTop.x >= 0)
-			{
-				rect.left = mSelectedObjectsArea->mLeftTop.x;
-				rect.top = mSelectedObjectsArea->mLeftTop.y;
-				rect.right = mSelectedObjectsArea->mRightBottom.x;
-				rect.bottom = mSelectedObjectsArea->mRightBottom.y;
+			SET_RECT_BY_OBJ_POINTER(rect, mDragSelectionArea);
+			mObjectBrush->SetColor(mDragSelectionArea->mBackgroundColor);
+			mRenderTarget->FillRectangle(rect, mObjectBrush);
 
-				mObjectBrush->SetColor(mSelectedObjectsArea->mLineColor);
-				mRenderTarget->DrawRectangle(rect, mObjectBrush);
-			}
+			mObjectBrush->SetColor(mDragSelectionArea->mLineColor);
+			mRenderTarget->DrawRectangle(rect, mObjectBrush);
+
+			SET_RECT_BY_OBJ_POINTER(rect, mSelectedObjectsArea);
+			rect.left -= SELECTED_RECT_MARGIN;
+			rect.top -= SELECTED_RECT_MARGIN;
+			rect.right += SELECTED_RECT_MARGIN;
+			rect.bottom += SELECTED_RECT_MARGIN;
+			mObjectBrush->SetColor(mSelectedObjectsArea->mLineColor);
+			mRenderTarget->DrawRectangle(rect, mObjectBrush);
+
+			SET_RECT_BY_OBJ_POINTER(rect, mNewObjectArea);
+			mObjectBrush->SetColor(mDragSelectionArea->mLineColor);
+			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 		}
 		return mRenderTarget->EndDraw();
-	}
-
-	HRESULT App::drawNewObjectSize(D2D1_RECT_F objectRect)
-	{
-		HRESULT hr = createDeviceResources();
-
-		if (SUCCEEDED(hr))
-		{
-			mRenderTarget->BeginDraw();
-			{
-				mRenderTarget->DrawRectangle(objectRect, mLineBrush);
-			}
-			mRenderTarget->EndDraw();
-		}
-
-		return hr;
-	}
-
-	HRESULT App::drawDragSelection(D2D1_RECT_F selectedArea)
-	{
-		HRESULT hr = createDeviceResources();
-
-		if (SUCCEEDED(hr))
-		{
-			mRenderTarget->BeginDraw();
-			{
-				mRenderTarget->FillRectangle(selectedArea, mBackGroundBrush);
-				mRenderTarget->DrawRectangle(selectedArea, mLineBrush);
-			}
-			mRenderTarget->EndDraw();
-		}
-
-		return hr;
 	}
 
 	void App::addSelectedObject()
@@ -222,17 +195,16 @@ namespace canvas
 
 	Object* App::getObjectOnCursor(float x, float y) const
 	{
-		Object* result = nullptr;
-
 		if (mCurrMode == eMouseMode::Selected)
 		{
-			if (x >= mSelectedObjectsArea->mLeftTop.x - SELECT_MARGIN && x <= mSelectedObjectsArea->mRightBottom.x + SELECT_MARGIN
-				&& y >= mSelectedObjectsArea->mLeftTop.y - SELECT_MARGIN && y <= mSelectedObjectsArea->mRightBottom.y + SELECT_MARGIN)
+			if (x >= mSelectedObjectsArea->mLeftTop.x - OBJECT_MARGIN && x <= mSelectedObjectsArea->mRightBottom.x + OBJECT_MARGIN
+				&& y >= mSelectedObjectsArea->mLeftTop.y - OBJECT_MARGIN && y <= mSelectedObjectsArea->mRightBottom.y + OBJECT_MARGIN)
 			{
-				result = mSelectedObjectsArea;
-				goto obj_return;
+				return mSelectedObjectsArea;
 			}
 		}
+
+		Object* result = nullptr;
 		
 		for (auto obj : mObjects)
 		{
@@ -243,8 +215,8 @@ namespace canvas
 
 			if (obj->mBackgroundColor.a > 0.0)
 			{
-				if (x >= obj->mLeftTop.x - SELECT_MARGIN && x <= obj->mRightBottom.x + SELECT_MARGIN
-					&& y >= obj->mLeftTop.y - SELECT_MARGIN && y <= obj->mRightBottom.y + SELECT_MARGIN)
+				if (x >= obj->mLeftTop.x - OBJECT_MARGIN && x <= obj->mRightBottom.x + OBJECT_MARGIN
+					&& y >= obj->mLeftTop.y - OBJECT_MARGIN && y <= obj->mRightBottom.y + OBJECT_MARGIN)
 				{
 					result = obj;
 					break;
@@ -252,19 +224,19 @@ namespace canvas
 			}
 			else
 			{
-				if (y >= TOP - SELECT_MARGIN && y <= TOP + SELECT_MARGIN
-					|| y >= BOTTOM - SELECT_MARGIN && y <= BOTTOM + SELECT_MARGIN)
+				if (y >= TOP - OBJECT_MARGIN && y <= TOP + OBJECT_MARGIN
+					|| y >= BOTTOM - OBJECT_MARGIN && y <= BOTTOM + OBJECT_MARGIN)
 				{
-					if (x >= LEFT - SELECT_MARGIN && x <= RIGHT + SELECT_MARGIN)
+					if (x >= LEFT - OBJECT_MARGIN && x <= RIGHT + OBJECT_MARGIN)
 					{
 						result = obj;
 						break;
 					}
 				}
-				else if (x >= LEFT - SELECT_MARGIN && x <= LEFT + SELECT_MARGIN
-					|| x >= RIGHT - SELECT_MARGIN && x <= RIGHT + SELECT_MARGIN)
+				else if (x >= LEFT - OBJECT_MARGIN && x <= LEFT + OBJECT_MARGIN
+					|| x >= RIGHT - OBJECT_MARGIN && x <= RIGHT + OBJECT_MARGIN)
 				{
-					if (y >= TOP - SELECT_MARGIN && y <= BOTTOM + SELECT_MARGIN)
+					if (y >= TOP - OBJECT_MARGIN && y <= BOTTOM + OBJECT_MARGIN)
 					{
 						result = obj;
 						break;
@@ -273,7 +245,6 @@ namespace canvas
 			}
 		}
 
-	obj_return:
 		return result;
 	}
 
@@ -327,11 +298,16 @@ namespace canvas
 
 		if (maxRight == -1.f)
 		{
-			assert(maxBottom == -1.f);
-			out.left = -1.f;
-			out.top = -1.f;
-			out.right = 0.f;
-			out.bottom = 0.f;
+#ifdef _DEBUG
+			if (maxBottom != -1.f)
+			{
+				__debugbreak();
+			}
+#endif
+			out.left = NONE_POINT;
+			out.top = NONE_POINT;
+			out.right = NONE_POINT;
+			out.bottom = NONE_POINT;
 		}
 		else
 		{
@@ -367,8 +343,6 @@ namespace canvas
 
 	LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
-		LRESULT result = 0;
-
 		switch (message)
 		{
 		case WM_DESTROY:
@@ -380,10 +354,12 @@ namespace canvas
 				switch (mCurrMode)
 				{
 				case eMouseMode::Select:
-					mInstance->drawDragSelection({ mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y });
+					mDragSelectionArea->mLeftTop = mStartPoint;
+					mDragSelectionArea->mRightBottom = mEndPoint;
 					break;
 				case eMouseMode::Rect:
-					mInstance->drawNewObjectSize({ mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y });
+					mNewObjectArea->mLeftTop = mStartPoint;
+					mNewObjectArea->mRightBottom = mEndPoint;
 					break;
 				}
 			}
@@ -417,21 +393,21 @@ namespace canvas
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 					mSelectedObjects.insert(selected);
 
-					mSelectedObjectsArea->SetLeftTopPoint({ selected->mLeftTop.x - SELECTED_RECT_MARGIN, selected->mLeftTop.y - SELECTED_RECT_MARGIN });
-					mSelectedObjectsArea->SetRightBottom({ selected->mRightBottom.x + SELECTED_RECT_MARGIN, selected->mRightBottom.y + SELECTED_RECT_MARGIN });
+					mSelectedObjectsArea->SetLeftTopPoint({ selected->mLeftTop.x, selected->mLeftTop.y });
+					mSelectedObjectsArea->SetRightBottom({ selected->mRightBottom.x, selected->mRightBottom.y });
 
 					mCurrMode = eMouseMode::Selected;
 				}
 				else
 				{
-					mSelectedObjectsArea->SetLeftTopPoint({ -1, -1 });
-					mSelectedObjectsArea->SetRightBottom({ 0, 0 });
+					SET_NONE_RECT(mSelectedObjectsArea);
 					mCurrMode = eMouseMode::Select;
 				}
 			}
 				break;
 			case eMouseMode::Rect:
 				SetCursor(LoadCursor(nullptr, IDC_CROSS));
+				SET_NONE_RECT(mSelectedObjectsArea);
 				break;
 			default:
 				break;
@@ -446,13 +422,14 @@ namespace canvas
 				switch (mCurrMode)
 				{
 				case eMouseMode::Select:
-					mInstance->drawDragSelection({ mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y });
+					mDragSelectionArea->mLeftTop = mStartPoint;
+					mDragSelectionArea->mRightBottom = mEndPoint;
 
-					D2D1_RECT_F boundary;
-					mInstance->getSelectedObjectsBoundary(boundary);
+					D2D1_RECT_F selectedBoundary;
+					mInstance->getSelectedObjectsBoundary(selectedBoundary);
 
-					mSelectedObjectsArea->SetLeftTopPoint({ boundary.left - SELECTED_RECT_MARGIN, boundary.top - SELECTED_RECT_MARGIN });
-					mSelectedObjectsArea->SetRightBottom({ boundary.right + SELECTED_RECT_MARGIN, boundary.bottom + SELECTED_RECT_MARGIN });
+					mSelectedObjectsArea->SetLeftTopPoint({ selectedBoundary.left, selectedBoundary.top });
+					mSelectedObjectsArea->SetRightBottom({ selectedBoundary.right, selectedBoundary.bottom });
 					break;
 				case eMouseMode::Selected:
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
@@ -464,7 +441,8 @@ namespace canvas
 					break;
 				case eMouseMode::Rect:
 					SetCursor(LoadCursor(nullptr, IDC_CROSS));
-					mInstance->drawNewObjectSize({ mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y });
+					mNewObjectArea->mLeftTop = mStartPoint;
+					mNewObjectArea->mRightBottom = mEndPoint;
 					break;
 				default:
 					__debugbreak();
@@ -504,6 +482,8 @@ namespace canvas
 				{
 					mCurrMode = eMouseMode::Selected;
 				}
+
+				SET_NONE_RECT(mDragSelectionArea);
 				break;
 			case eMouseMode::Selected:
 				if (mSelectedObjects.size() > 0)
@@ -514,7 +494,10 @@ namespace canvas
 				break;
 			case eMouseMode::Rect:
 				mInstance->addSelectedObject();
-				mInstance->mCurrMode = eMouseMode::Select;
+
+				SET_NONE_RECT(mNewObjectArea);
+
+				mCurrMode = eMouseMode::Select;
 				break;
 			default:
 				__debugbreak();
@@ -522,8 +505,8 @@ namespace canvas
 			}
 
 			mbLButtonDown = false;
-			mEndPoint.x = -1;
-			mEndPoint.y = -1;
+			mEndPoint.x = NONE_POINT;
+			mEndPoint.y = NONE_POINT;
 			break;
 		case WM_KEYDOWN:
 			if (PRESSED(GetAsyncKeyState('1')))
@@ -535,16 +518,12 @@ namespace canvas
 			{
 				mCurrMode = eMouseMode::Rect;
 				SetCursor(LoadCursor(nullptr, IDC_CROSS));
-
-				mSelectedObjectsArea->SetLeftTopPoint({ -1, -1 });
-				mSelectedObjectsArea->SetRightBottom({ 0, 0 });
 			}
 			else if (PRESSED(GetAsyncKeyState('D')) || wParam == VK_BACK)
 			{
 				mInstance->removeSelectedObject();
 
-				mSelectedObjectsArea->SetLeftTopPoint({ -1, -1 });
-				mSelectedObjectsArea->SetRightBottom({ 0, 0 });
+				SET_NONE_RECT(mSelectedObjectsArea);
 				mCurrMode = eMouseMode::Select;
 			}
 			break;
@@ -552,7 +531,7 @@ namespace canvas
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 
-		mInstance->drawObjects();
+		mInstance->render();
 
 		return 0;
 	}
