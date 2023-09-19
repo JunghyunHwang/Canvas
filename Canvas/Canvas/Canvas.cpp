@@ -77,7 +77,12 @@ App* InitInstance(HINSTANCE hInstance, int nCmdShow)
    }
 
    App* app = canvas::App::GetInstance();
-   app->Init(hWnd, { 1280, 760 });
+
+   if (FAILED(app->Init(hWnd, { 1280, 760 })))
+   {
+       app->Release();
+       return nullptr;
+   }
 
    ShowWindow(hWnd, nCmdShow);
 

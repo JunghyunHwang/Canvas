@@ -12,6 +12,8 @@ namespace canvas
 	Object* App::mDragSelectionArea = nullptr;
 	Object* App::mSelectedObjectsArea = nullptr;
 	Object* App::mNewObjectArea = nullptr;
+	Object* App::mResizingRects[RESIZING_RECTS_COUNT];
+
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
 
@@ -53,6 +55,11 @@ namespace canvas
 			delete obj;
 		}
 
+		for (auto obj : mResizingRects)
+		{
+			delete obj;
+		}
+
 		delete mSelectedObjectsArea;
 		delete mDragSelectionArea;
 		delete mNewObjectArea;
@@ -70,10 +77,6 @@ namespace canvas
 		mHwnd = hWnd;
 		mResolution = resolution;
 
-		mDragSelectionArea = new Object(D2D1::ColorF(0.f, 0.f, 0.f, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
-		mSelectedObjectsArea = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
-		mNewObjectArea = new Object();
-
 		RECT rt = { 0, 0, mResolution.x, mResolution.y };
 		AdjustWindowRect(&rt, WS_OVERLAPPEDWINDOW, true);
 		SetWindowPos(mHwnd, nullptr, 200, 200, rt.right - rt.left, rt.bottom - rt.top, 0);
@@ -83,6 +86,15 @@ namespace canvas
 		if (SUCCEEDED(hr))
 		{
 			hr = createDeviceResources();
+		}
+
+		mDragSelectionArea = new Object(D2D1::ColorF(0.f, 0.f, 0.f, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
+		mSelectedObjectsArea = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
+		mNewObjectArea = new Object();
+
+		for (size_t i = 0; i < RESIZING_RECTS_COUNT; ++i)
+		{
+			mResizingRects[i] = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0xFFFFFF, 1.f));
 		}
 
 		return hr;
@@ -142,15 +154,31 @@ namespace canvas
 			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 
 			SET_RECT_BY_OBJ_POINTER(rect, mSelectedObjectsArea);
-			rect.left -= SELECTED_RECT_MARGIN;
-			rect.top -= SELECTED_RECT_MARGIN;
-			rect.right += SELECTED_RECT_MARGIN;
-			rect.bottom += SELECTED_RECT_MARGIN;
 			mObjectBrush->SetColor(mSelectedObjectsArea->mLineColor);
 			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 
+			if (mSelectedObjectsArea->mLeftTop.x == NONE_POINT)
+			{
+				setResizingRectsNone();
+			}
+			else
+			{
+				setResizingRectsPoint();
+
+				for (auto obj : mResizingRects)
+				{
+					SET_RECT_BY_OBJ_POINTER(rect, obj);
+
+					mObjectBrush->SetColor(obj->mBackgroundColor);
+					mRenderTarget->FillRectangle(rect, mObjectBrush);
+
+					mObjectBrush->SetColor(obj->mLineColor);
+					mRenderTarget->DrawRectangle(rect, mObjectBrush);
+				}
+			}
+			
 			SET_RECT_BY_OBJ_POINTER(rect, mNewObjectArea);
-			mObjectBrush->SetColor(mDragSelectionArea->mLineColor);
+			mObjectBrush->SetColor(mNewObjectArea->mLineColor);
 			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 		}
 		return mRenderTarget->EndDraw();
@@ -311,10 +339,10 @@ namespace canvas
 		}
 		else
 		{
-			out.left = minLeft;
-			out.top = minTop;
-			out.right = maxRight;
-			out.bottom = maxBottom;
+			out.left = minLeft - SELECTED_RECT_MARGIN;
+			out.top = minTop - SELECTED_RECT_MARGIN;
+			out.right = maxRight + SELECTED_RECT_MARGIN;
+			out.bottom = maxBottom + SELECTED_RECT_MARGIN;
 		}
 
 		return result;
@@ -393,8 +421,8 @@ namespace canvas
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 					mSelectedObjects.insert(selected);
 
-					mSelectedObjectsArea->SetLeftTopPoint({ selected->mLeftTop.x, selected->mLeftTop.y });
-					mSelectedObjectsArea->SetRightBottom({ selected->mRightBottom.x, selected->mRightBottom.y });
+					mSelectedObjectsArea->mLeftTop = { selected->mLeftTop.x - SELECTED_RECT_MARGIN, selected->mLeftTop.y - SELECTED_RECT_MARGIN };
+					mSelectedObjectsArea->mRightBottom = { selected->mRightBottom.x + SELECTED_RECT_MARGIN, selected->mRightBottom.y + SELECTED_RECT_MARGIN };
 
 					mCurrMode = eMouseMode::Selected;
 				}

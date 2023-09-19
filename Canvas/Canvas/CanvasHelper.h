@@ -4,6 +4,8 @@
 #define OBJECT_MARGIN (10)
 #define SELECTED_RECT_MARGIN (5)
 #define NONE_POINT (-10.f)
+#define RESIZING_RECTS_COUNT (8)
+#define RESIZING_RECT_SIZE (4)
 
 #define PRESSED(key) ((key) & 0x8000)
 
