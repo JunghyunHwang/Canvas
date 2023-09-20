@@ -23,9 +23,24 @@ enum class eMouseMode
 {
 	Select,
 	Selected,
+	Resize,
 	Rect,
 
 	Count
+};
+
+enum class eResizingRect
+{
+	NorthWest,
+	North,
+	NorthEast,
+	West,
+	East,
+	SouthWest,
+	South,
+	SouthEast,
+
+	None
 };
 
 template<typename Interface>

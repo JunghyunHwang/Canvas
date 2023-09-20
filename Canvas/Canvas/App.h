@@ -28,7 +28,7 @@ namespace canvas
 		void addSelectedObject();
 		void removeSelectedObject();
 		void moveSelectedObjects(float x, float y);
-		Object* getObjectOnCursor(float x, float y) const;
+		Object* getObjectOnCursor(float x, float y);
 		int getSelectedObjectsBoundary(D2D1_RECT_F& out);
 
 	private:
@@ -47,6 +47,8 @@ namespace canvas
 
 		static Object* mDragSelectionArea;
 		static Object* mSelectedObjectsArea;
+		static Object* mSelectedResizingRect;
+		static eResizingRect mSelectedResizingRectDirection;
 		static Object* mNewObjectArea;
 		static Object* mResizingRects[RESIZING_RECTS_COUNT];
 

@@ -11,8 +11,10 @@ namespace canvas
 
 	Object* App::mDragSelectionArea = nullptr;
 	Object* App::mSelectedObjectsArea = nullptr;
+	Object* App::mSelectedResizingRect = nullptr;
 	Object* App::mNewObjectArea = nullptr;
 	Object* App::mResizingRects[RESIZING_RECTS_COUNT];
+	eResizingRect App::mSelectedResizingRectDirection = eResizingRect::None;
 
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
@@ -221,10 +223,24 @@ namespace canvas
 		}
 	}
 
-	Object* App::getObjectOnCursor(float x, float y) const
+	Object* App::getObjectOnCursor(float x, float y)
 	{
 		if (mCurrMode == eMouseMode::Selected)
 		{
+			for (size_t i = 0; i < RESIZING_RECTS_COUNT; ++i)
+			{
+				if (x >= mResizingRects[i]->mLeftTop.x && x <= mResizingRects[i]->mRightBottom.x
+					&& y >= mResizingRects[i]->mLeftTop.y && y <= mResizingRects[i]->mRightBottom.y)
+				{
+					mSelectedResizingRect = mResizingRects[i];
+					mSelectedResizingRectDirection = static_cast<eResizingRect>(i);
+
+					return mResizingRects[i];
+				}
+			}
+
+			mSelectedResizingRectDirection = eResizingRect::None;
+			
 			if (x >= mSelectedObjectsArea->mLeftTop.x - OBJECT_MARGIN && x <= mSelectedObjectsArea->mRightBottom.x + OBJECT_MARGIN
 				&& y >= mSelectedObjectsArea->mLeftTop.y - OBJECT_MARGIN && y <= mSelectedObjectsArea->mRightBottom.y + OBJECT_MARGIN)
 			{
@@ -409,7 +425,39 @@ namespace canvas
 			{
 				Object* selected = mInstance->getObjectOnCursor(mStartPoint.x, mStartPoint.y);
 
-				if (selected == mSelectedObjectsArea)
+				if (mSelectedResizingRectDirection != eResizingRect::None)
+				{
+					mCurrMode = eMouseMode::Resize;
+
+					switch (mSelectedResizingRectDirection)
+					{
+					case eResizingRect::NorthWest:
+					case eResizingRect::SouthEast:
+						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+						break;
+					case eResizingRect::South:
+					case eResizingRect::North:
+						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+						break;
+					case eResizingRect::NorthEast:
+					case eResizingRect::SouthWest:
+						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+						break;
+					case eResizingRect::West:
+					case eResizingRect::East:
+						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+						break;
+					case eResizingRect::None:
+						SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
+						break;
+					default:
+						__debugbreak();
+						break;
+					}
+
+					break;
+				}
+				else if (selected == mSelectedObjectsArea)
 				{
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 					break;
@@ -438,6 +486,7 @@ namespace canvas
 				SET_NONE_RECT(mSelectedObjectsArea);
 				break;
 			default:
+				__debugbreak();
 				break;
 			}
 			break;
@@ -456,8 +505,8 @@ namespace canvas
 					D2D1_RECT_F selectedBoundary;
 					mInstance->getSelectedObjectsBoundary(selectedBoundary);
 
-					mSelectedObjectsArea->SetLeftTopPoint({ selectedBoundary.left, selectedBoundary.top });
-					mSelectedObjectsArea->SetRightBottom({ selectedBoundary.right, selectedBoundary.bottom });
+					mSelectedObjectsArea->mLeftTop = { selectedBoundary.left, selectedBoundary.top };
+					mSelectedObjectsArea->mRightBottom = { selectedBoundary.right, selectedBoundary.bottom };
 					break;
 				case eMouseMode::Selected:
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
@@ -466,6 +515,75 @@ namespace canvas
 
 					mStartPoint.x = mEndPoint.x;
 					mStartPoint.y = mEndPoint.y;
+					break;
+				case eMouseMode::Resize:
+				{
+#ifdef _DEBUG
+					if (mSelectedResizingRect == nullptr)
+					{
+						__debugbreak();
+					}
+#endif
+					D2D1_RECT_F resizingSize;
+					const float DIFF_X = mEndPoint.x - mStartPoint.x;
+					const float DIFF_Y = mEndPoint.y - mStartPoint.y;
+
+					switch (mSelectedResizingRectDirection)
+					{
+					case eResizingRect::NorthWest:
+						resizingSize = { DIFF_X, DIFF_Y, 0, 0 };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+						break;
+					case eResizingRect::North:
+						resizingSize = { 0, DIFF_Y, 0, 0 };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+						break;
+					case eResizingRect::NorthEast:
+						resizingSize = { 0, DIFF_Y, DIFF_X, 0 };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+						break;
+					case eResizingRect::West:
+						resizingSize = { DIFF_X, 0, 0, 0 };
+						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+						break;
+					case eResizingRect::East:
+						resizingSize = { 0, 0, DIFF_X, 0 };
+						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+						break;
+					case eResizingRect::SouthWest:
+						resizingSize = { DIFF_X, 0, 0, DIFF_Y };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+						break;
+					case eResizingRect::South:
+						resizingSize = { 0, 0, 0, DIFF_Y };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+						break;
+					case eResizingRect::SouthEast:
+						resizingSize = { 0, 0, DIFF_X, DIFF_Y };
+						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+						break;
+					default:
+						__debugbreak();
+						break;
+					}
+
+					for (auto obj : mSelectedObjects)
+					{
+						obj->mLeftTop.x += resizingSize.left;
+						obj->mLeftTop.y += resizingSize.top;
+						obj->mRightBottom.x += resizingSize.right;
+						obj->mRightBottom.y += resizingSize.bottom;
+					}
+
+					mSelectedObjectsArea->mLeftTop.x += resizingSize.left;
+					mSelectedObjectsArea->mLeftTop.y += resizingSize.top;
+					mSelectedObjectsArea->mRightBottom.x += resizingSize.right;
+					mSelectedObjectsArea->mRightBottom.y += resizingSize.bottom;
+
+					mStartPoint.x = mEndPoint.x;
+					mStartPoint.y = mEndPoint.y;
+				}
+					
 					break;
 				case eMouseMode::Rect:
 					SetCursor(LoadCursor(nullptr, IDC_CROSS));
@@ -485,7 +603,31 @@ namespace canvas
 				case eMouseMode::Selected:
 					if (mInstance->getObjectOnCursor(LOWORD(lParam), HIWORD(lParam)))
 					{
-						SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
+						switch (mSelectedResizingRectDirection)
+						{
+						case eResizingRect::NorthWest:
+						case eResizingRect::SouthEast:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+							break;
+						case eResizingRect::South:
+						case eResizingRect::North:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+							break;
+						case eResizingRect::NorthEast:
+						case eResizingRect::SouthWest:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+							break;
+						case eResizingRect::West:
+						case eResizingRect::East:
+							SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+							break;
+						case eResizingRect::None:
+							SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
+							break;
+						default:
+							__debugbreak();
+							break;
+						}
 					}
 					break;
 				case eMouseMode::Rect:
@@ -519,6 +661,11 @@ namespace canvas
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 					mCurrMode = eMouseMode::Selected;
 				}
+				break;
+			case eMouseMode::Resize:
+				mCurrMode = eMouseMode::Selected;
+				mSelectedResizingRect = nullptr;
+				mSelectedResizingRectDirection = eResizingRect::None;
 				break;
 			case eMouseMode::Rect:
 				mInstance->addSelectedObject();
