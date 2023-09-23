@@ -19,6 +19,15 @@
 								object->mRightBottom.x = NONE_POINT;\
 								object->mRightBottom.y = NONE_POINT;\
 
+#define ADD_MARGIN_TO_RECT(rect, margin)	rect.left -= margin;\
+											rect.top -= margin;\
+											rect.right += margin;\
+											rect.bottom += margin;\
+
+#define DEBUG_BREAK(expression)	if (!(expression)) {\
+									__debugbreak();\
+								}\
+
 enum class eMouseMode
 {
 	Select,
@@ -29,7 +38,7 @@ enum class eMouseMode
 	Count
 };
 
-enum class eResizingRect
+enum class eResizingDirection
 {
 	NorthWest,
 	North,

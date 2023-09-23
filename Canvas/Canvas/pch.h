@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <limits>
 #include <intrin.h>
+#include <cassert>
 
 #include <d2d1.h>
 #include <d2d1helper.h>

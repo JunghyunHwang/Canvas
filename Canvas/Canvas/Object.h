@@ -15,10 +15,14 @@ namespace canvas
 		Object(const Object& other) = default;
 		Object& operator=(const Object& rhs) = default;
 
+		inline float GetWidth() const;
+		inline float GetHeight() const;
+
 		inline void SetLineColor(D2D1::ColorF color);
 		inline void SetBackGroundColor(D2D1::ColorF color);
 		inline void SetLeftTopPoint(D2D1_POINT_2F pos);
 		inline void SetRightBottom(D2D1_POINT_2F pos);
+		inline void SetRect(D2D1_RECT_F& rect);
 		inline void Move(float x, float y);
 
 	private:
@@ -28,6 +32,16 @@ namespace canvas
 		D2D1::ColorF mLineColor;
 		D2D1::ColorF mBackgroundColor;
 	};
+
+	inline float Object::GetWidth() const
+	{
+		return mRightBottom.x - mLeftTop.x;
+	}
+
+	inline float Object::GetHeight() const
+	{
+		return mRightBottom.y - mLeftTop.y;
+	}
 
 	inline void Object::SetLineColor(D2D1::ColorF color)
 	{
@@ -47,6 +61,12 @@ namespace canvas
 	inline void Object::SetRightBottom(D2D1_POINT_2F pos)
 	{
 		mRightBottom = pos;
+	}
+
+	inline void Object::SetRect(D2D1_RECT_F& rect)
+	{
+		mLeftTop = { rect.left, rect.top };
+		mRightBottom = { rect.right, rect.bottom };
 	}
 
 	inline void Object::Move(float x, float y)

@@ -10,11 +10,11 @@ namespace canvas
 	D2D1_POINT_2F App::mEndPoint = { -1, -1 };
 
 	Object* App::mDragSelectionArea = nullptr;
-	Object* App::mSelectedObjectsArea = nullptr;
+	Object* App::mSelectedBoundary = nullptr;
 	Object* App::mSelectedResizingRect = nullptr;
 	Object* App::mNewObjectArea = nullptr;
 	Object* App::mResizingRects[RESIZING_RECTS_COUNT];
-	eResizingRect App::mSelectedResizingRectDirection = eResizingRect::None;
+	eResizingDirection App::mResizingDirection = eResizingDirection::None;
 
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
@@ -62,7 +62,7 @@ namespace canvas
 			delete obj;
 		}
 
-		delete mSelectedObjectsArea;
+		delete mSelectedBoundary;
 		delete mDragSelectionArea;
 		delete mNewObjectArea;
 		delete mInstance;
@@ -91,7 +91,7 @@ namespace canvas
 		}
 
 		mDragSelectionArea = new Object(D2D1::ColorF(0.f, 0.f, 0.f, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
-		mSelectedObjectsArea = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
+		mSelectedBoundary = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0, 0, 0, 0.f));
 		mNewObjectArea = new Object();
 
 		for (size_t i = 0; i < RESIZING_RECTS_COUNT; ++i)
@@ -155,11 +155,11 @@ namespace canvas
 			mObjectBrush->SetColor(mDragSelectionArea->mLineColor);
 			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 
-			SET_RECT_BY_OBJ_POINTER(rect, mSelectedObjectsArea);
-			mObjectBrush->SetColor(mSelectedObjectsArea->mLineColor);
+			SET_RECT_BY_OBJ_POINTER(rect, mSelectedBoundary);
+			mObjectBrush->SetColor(mSelectedBoundary->mLineColor);
 			mRenderTarget->DrawRectangle(rect, mObjectBrush);
 
-			if (mSelectedObjectsArea->mLeftTop.x == NONE_POINT)
+			if (mSelectedBoundary->mLeftTop.x == NONE_POINT)
 			{
 				setResizingRectsNone();
 			}
@@ -211,16 +211,15 @@ namespace canvas
 		{
 #ifdef _DEBUG
 			size_t ret = mObjects.erase(obj);
-			if (ret == 0)
-			{
-				__debugbreak();
-			}
+			DEBUG_BREAK(ret != 0);
 #else
 			mObjects.erase(obj);
 #endif
 
 			delete obj;
 		}
+
+		mSelectedObjects.clear();
 	}
 
 	Object* App::getObjectOnCursor(float x, float y)
@@ -233,18 +232,18 @@ namespace canvas
 					&& y >= mResizingRects[i]->mLeftTop.y && y <= mResizingRects[i]->mRightBottom.y)
 				{
 					mSelectedResizingRect = mResizingRects[i];
-					mSelectedResizingRectDirection = static_cast<eResizingRect>(i);
+					mResizingDirection = static_cast<eResizingDirection>(i);
 
 					return mResizingRects[i];
 				}
 			}
 
-			mSelectedResizingRectDirection = eResizingRect::None;
+			mResizingDirection = eResizingDirection::None;
 			
-			if (x >= mSelectedObjectsArea->mLeftTop.x - OBJECT_MARGIN && x <= mSelectedObjectsArea->mRightBottom.x + OBJECT_MARGIN
-				&& y >= mSelectedObjectsArea->mLeftTop.y - OBJECT_MARGIN && y <= mSelectedObjectsArea->mRightBottom.y + OBJECT_MARGIN)
+			if (x >= mSelectedBoundary->mLeftTop.x - OBJECT_MARGIN && x <= mSelectedBoundary->mRightBottom.x + OBJECT_MARGIN
+				&& y >= mSelectedBoundary->mLeftTop.y - OBJECT_MARGIN && y <= mSelectedBoundary->mRightBottom.y + OBJECT_MARGIN)
 			{
-				return mSelectedObjectsArea;
+				return mSelectedBoundary;
 			}
 		}
 
@@ -343,10 +342,7 @@ namespace canvas
 		if (maxRight == -1.f)
 		{
 #ifdef _DEBUG
-			if (maxBottom != -1.f)
-			{
-				__debugbreak();
-			}
+			DEBUG_BREAK(maxBottom == -1.f);
 #endif
 			out.left = NONE_POINT;
 			out.top = NONE_POINT;
@@ -355,13 +351,58 @@ namespace canvas
 		}
 		else
 		{
-			out.left = minLeft - SELECTED_RECT_MARGIN;
-			out.top = minTop - SELECTED_RECT_MARGIN;
-			out.right = maxRight + SELECTED_RECT_MARGIN;
-			out.bottom = maxBottom + SELECTED_RECT_MARGIN;
+			out.left = minLeft;
+			out.top = minTop;
+			out.right = maxRight;
+			out.bottom = maxBottom;
 		}
 
 		return result;
+	}
+
+	void App::getResizeRect(D2D1_RECT_F& out)
+	{
+		const float DIFF_X = mEndPoint.x - mStartPoint.x;
+		const float DIFF_Y = mEndPoint.y - mStartPoint.y;
+
+		switch (mResizingDirection)
+		{
+		case eResizingDirection::NorthWest:
+			out = { DIFF_X, DIFF_Y, 0, 0 };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+			break;
+		case eResizingDirection::North:
+			out = { 0, DIFF_Y, 0, 0 };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+			break;
+		case eResizingDirection::NorthEast:
+			out = { 0, DIFF_Y, DIFF_X, 0 };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+			break;
+		case eResizingDirection::West:
+			out = { DIFF_X, 0, 0, 0 };
+			SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+			break;
+		case eResizingDirection::East:
+			out = { 0, 0, DIFF_X, 0 };
+			SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
+			break;
+		case eResizingDirection::SouthWest:
+			out = { DIFF_X, 0, 0, DIFF_Y };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+			break;
+		case eResizingDirection::South:
+			out = { 0, 0, 0, DIFF_Y };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+			break;
+		case eResizingDirection::SouthEast:
+			out = { 0, 0, DIFF_X, DIFF_Y };
+			SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+			break;
+		default:
+			assert(false);
+			break;
+		}
 	}
 
 	void App::moveSelectedObjects(float x, float y)
@@ -371,7 +412,7 @@ namespace canvas
 			obj->Move(x, y);
 		}
 
-		mSelectedObjectsArea->Move(x, y);
+		mSelectedBoundary->Move(x, y);
 	}
 
 	void App::Run()
@@ -409,11 +450,9 @@ namespace canvas
 			}
 			break;
 		case WM_LBUTTONDOWN:
-			if (mbLButtonDown)
-			{
-				__debugbreak();
-			}
-
+#ifdef _DEBUG
+			DEBUG_BREAK(!mbLButtonDown);
+#endif
 			mbLButtonDown = true;
 			mStartPoint.x = LOWORD(lParam);
 			mStartPoint.y = HIWORD(lParam);
@@ -425,68 +464,69 @@ namespace canvas
 			{
 				Object* selected = mInstance->getObjectOnCursor(mStartPoint.x, mStartPoint.y);
 
-				if (mSelectedResizingRectDirection != eResizingRect::None)
+				if (selected == nullptr)
+				{
+					SET_NONE_RECT(mSelectedBoundary);
+					mCurrMode = eMouseMode::Select;
+					break;
+				}
+				else if (mResizingDirection != eResizingDirection::None)
 				{
 					mCurrMode = eMouseMode::Resize;
 
-					switch (mSelectedResizingRectDirection)
+					switch (mResizingDirection)
 					{
-					case eResizingRect::NorthWest:
-					case eResizingRect::SouthEast:
+					case eResizingDirection::NorthWest:
+					case eResizingDirection::SouthEast:
 						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
 						break;
-					case eResizingRect::South:
-					case eResizingRect::North:
+					case eResizingDirection::South:
+					case eResizingDirection::North:
 						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
 						break;
-					case eResizingRect::NorthEast:
-					case eResizingRect::SouthWest:
+					case eResizingDirection::NorthEast:
+					case eResizingDirection::SouthWest:
 						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
 						break;
-					case eResizingRect::West:
-					case eResizingRect::East:
+					case eResizingDirection::West:
+					case eResizingDirection::East:
 						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
 						break;
-					case eResizingRect::None:
+					case eResizingDirection::None:
 						SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 						break;
 					default:
-						__debugbreak();
+						assert(false);
 						break;
 					}
 
 					break;
 				}
-				else if (selected == mSelectedObjectsArea)
+				else if (selected == mSelectedBoundary)
 				{
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 					break;
 				}
 
 				mSelectedObjects.clear();
-				if (selected != nullptr)
-				{
-					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
-					mSelectedObjects.insert(selected);
 
-					mSelectedObjectsArea->mLeftTop = { selected->mLeftTop.x - SELECTED_RECT_MARGIN, selected->mLeftTop.y - SELECTED_RECT_MARGIN };
-					mSelectedObjectsArea->mRightBottom = { selected->mRightBottom.x + SELECTED_RECT_MARGIN, selected->mRightBottom.y + SELECTED_RECT_MARGIN };
+				SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
+				mSelectedObjects.insert(selected);
 
-					mCurrMode = eMouseMode::Selected;
-				}
-				else
-				{
-					SET_NONE_RECT(mSelectedObjectsArea);
-					mCurrMode = eMouseMode::Select;
-				}
+				D2D1_RECT_F rect;
+				SET_RECT_BY_OBJ_POINTER(rect, selected);
+				ADD_MARGIN_TO_RECT(rect, SELECTED_RECT_MARGIN);
+				mSelectedBoundary->SetRect(rect);
+
+				mCurrMode = eMouseMode::Selected;
 			}
 				break;
 			case eMouseMode::Rect:
 				SetCursor(LoadCursor(nullptr, IDC_CROSS));
-				SET_NONE_RECT(mSelectedObjectsArea);
+				SET_NONE_RECT(mSelectedBoundary);
 				break;
 			default:
-				__debugbreak();
+				assert(false);
 				break;
 			}
 			break;
@@ -505,8 +545,8 @@ namespace canvas
 					D2D1_RECT_F selectedBoundary;
 					mInstance->getSelectedObjectsBoundary(selectedBoundary);
 
-					mSelectedObjectsArea->mLeftTop = { selectedBoundary.left, selectedBoundary.top };
-					mSelectedObjectsArea->mRightBottom = { selectedBoundary.right, selectedBoundary.bottom };
+					ADD_MARGIN_TO_RECT(selectedBoundary, SELECTED_RECT_MARGIN);
+					mSelectedBoundary->SetRect(selectedBoundary);
 					break;
 				case eMouseMode::Selected:
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
@@ -519,71 +559,183 @@ namespace canvas
 				case eMouseMode::Resize:
 				{
 #ifdef _DEBUG
-					if (mSelectedResizingRect == nullptr)
-					{
-						__debugbreak();
-					}
+					DEBUG_BREAK(mSelectedResizingRect != nullptr);
+					DEBUG_BREAK(mSelectedObjects.size() > 0);
 #endif
-					D2D1_RECT_F resizingSize;
-					const float DIFF_X = mEndPoint.x - mStartPoint.x;
-					const float DIFF_Y = mEndPoint.y - mStartPoint.y;
+					D2D1_RECT_F resize;
 
-					switch (mSelectedResizingRectDirection)
+					if (mSelectedObjects.size() == 1)
 					{
-					case eResizingRect::NorthWest:
-						resizingSize = { DIFF_X, DIFF_Y, 0, 0 };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
-						break;
-					case eResizingRect::North:
-						resizingSize = { 0, DIFF_Y, 0, 0 };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
-						break;
-					case eResizingRect::NorthEast:
-						resizingSize = { 0, DIFF_Y, DIFF_X, 0 };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
-						break;
-					case eResizingRect::West:
-						resizingSize = { DIFF_X, 0, 0, 0 };
-						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
-						break;
-					case eResizingRect::East:
-						resizingSize = { 0, 0, DIFF_X, 0 };
-						SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
-						break;
-					case eResizingRect::SouthWest:
-						resizingSize = { DIFF_X, 0, 0, DIFF_Y };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
-						break;
-					case eResizingRect::South:
-						resizingSize = { 0, 0, 0, DIFF_Y };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENS));
-						break;
-					case eResizingRect::SouthEast:
-						resizingSize = { 0, 0, DIFF_X, DIFF_Y };
-						SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
-						break;
-					default:
-						__debugbreak();
-						break;
+						mInstance->getResizeRect(resize);
+
+						auto obj = mSelectedObjects.begin();
+						(*obj)->mLeftTop.x += resize.left;
+						(*obj)->mLeftTop.y += resize.top;
+						(*obj)->mRightBottom.x += resize.right;
+						(*obj)->mRightBottom.y += resize.bottom;
+					}
+					else
+					{
+						float diffX = mEndPoint.x - mStartPoint.x;
+						float diffY = mEndPoint.y - mStartPoint.y;
+
+						float oppositePointX;
+						float oppositePointY;
+
+						switch (mResizingDirection)
+						{
+						case eResizingDirection::NorthWest:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+							if (diffY == 0)
+							{
+								if (diffX == -1)
+								{
+									diffY = -1;
+								}
+								else
+								{
+									diffX = 0;
+								}
+							}
+							else if (diffX == 0)
+							{
+								if (diffY == -1)
+								{
+									diffX = -1;
+								}
+								else
+								{
+									diffY = 0;
+								}
+							}
+
+							resize = { diffX, diffY, 0, 0 };
+							oppositePointX = mSelectedBoundary->mRightBottom.x;
+							oppositePointY = mSelectedBoundary->mRightBottom.y;
+							break;
+						case eResizingDirection::NorthEast:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+							if (diffY == 0)
+							{
+								if (diffX == 1)
+								{
+									diffY = -1;
+								}
+								else
+								{
+									diffX = 0;
+								}
+							}
+							else if (diffX == 0)
+							{
+								if (diffY == -1)
+								{
+									diffX = 1;
+								}
+								else
+								{
+									diffY = 0;
+								}
+							}
+
+							resize = { 0, diffY, diffX, 0 };
+
+							oppositePointX = mSelectedBoundary->mLeftTop.x;
+							oppositePointY = mSelectedBoundary->mRightBottom.y;
+							break;
+						case eResizingDirection::SouthWest:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
+							if (diffY == 0)
+							{
+								if (diffX == -1)
+								{
+									diffY = 1;
+								}
+								else
+								{
+									diffX = 0;
+								}
+							}
+							else if (diffX == 0)
+							{
+								if (diffY == 1)
+								{
+									diffX = -1;
+								}
+								else
+								{
+									diffY = 0;
+								}
+							}
+
+							resize = { diffX, 0, 0, diffY };
+
+							oppositePointX = mSelectedBoundary->mRightBottom.x;
+							oppositePointY = mSelectedBoundary->mLeftTop.y;
+							break;
+						case eResizingDirection::SouthEast:
+							SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
+							if (diffY == 0)
+							{
+								if (diffX == 1)
+								{
+									diffY = 1;
+								}
+								else
+								{
+									diffX = 0;
+								}
+							}
+							else if (diffX == 0)
+							{
+								if (diffY == 1)
+								{
+									diffX = 1;
+								}
+								else
+								{
+									diffY = 0;
+								}
+							}
+
+							resize = { 0, 0, diffX, diffY };
+
+							oppositePointX = mSelectedBoundary->mLeftTop.x;
+							oppositePointY = mSelectedBoundary->mLeftTop.y;
+							break;
+						default:
+							assert(false);
+							break;
+						}
+
+						if (diffX == 0 && diffY == 0)
+						{
+							mEndPoint.x = mStartPoint.x;
+							mEndPoint.y = mStartPoint.y;
+							break;
+						}
+
+						const float boundaryWidth = mSelectedBoundary->GetWidth();
+						const float bouddaryHeight = mSelectedBoundary->GetHeight();
+
+						for (auto obj : mSelectedObjects)
+						{
+							obj->mLeftTop.x += abs(oppositePointX - obj->mLeftTop.x) / boundaryWidth * diffX;
+							obj->mLeftTop.y += abs(oppositePointY - obj->mLeftTop.y) / bouddaryHeight * diffY;
+
+							obj->mRightBottom.x += abs(oppositePointX - obj->mRightBottom.x) / boundaryWidth * diffX;
+							obj->mRightBottom.y += abs(oppositePointY - obj->mRightBottom.y) / bouddaryHeight * diffY;
+						}
 					}
 
-					for (auto obj : mSelectedObjects)
-					{
-						obj->mLeftTop.x += resizingSize.left;
-						obj->mLeftTop.y += resizingSize.top;
-						obj->mRightBottom.x += resizingSize.right;
-						obj->mRightBottom.y += resizingSize.bottom;
-					}
-
-					mSelectedObjectsArea->mLeftTop.x += resizingSize.left;
-					mSelectedObjectsArea->mLeftTop.y += resizingSize.top;
-					mSelectedObjectsArea->mRightBottom.x += resizingSize.right;
-					mSelectedObjectsArea->mRightBottom.y += resizingSize.bottom;
+					mSelectedBoundary->mLeftTop.x += resize.left;
+					mSelectedBoundary->mLeftTop.y += resize.top;
+					mSelectedBoundary->mRightBottom.x += resize.right;
+					mSelectedBoundary->mRightBottom.y += resize.bottom;
 
 					mStartPoint.x = mEndPoint.x;
 					mStartPoint.y = mEndPoint.y;
 				}
-					
 					break;
 				case eMouseMode::Rect:
 					SetCursor(LoadCursor(nullptr, IDC_CROSS));
@@ -591,7 +743,7 @@ namespace canvas
 					mNewObjectArea->mRightBottom = mEndPoint;
 					break;
 				default:
-					__debugbreak();
+					assert(false);
 					break;
 				}
 			}
@@ -603,29 +755,29 @@ namespace canvas
 				case eMouseMode::Selected:
 					if (mInstance->getObjectOnCursor(LOWORD(lParam), HIWORD(lParam)))
 					{
-						switch (mSelectedResizingRectDirection)
+						switch (mResizingDirection)
 						{
-						case eResizingRect::NorthWest:
-						case eResizingRect::SouthEast:
+						case eResizingDirection::NorthWest:
+						case eResizingDirection::SouthEast:
 							SetCursor(LoadCursor(nullptr, IDC_SIZENWSE));
 							break;
-						case eResizingRect::South:
-						case eResizingRect::North:
+						case eResizingDirection::South:
+						case eResizingDirection::North:
 							SetCursor(LoadCursor(nullptr, IDC_SIZENS));
 							break;
-						case eResizingRect::NorthEast:
-						case eResizingRect::SouthWest:
+						case eResizingDirection::NorthEast:
+						case eResizingDirection::SouthWest:
 							SetCursor(LoadCursor(nullptr, IDC_SIZENESW));
 							break;
-						case eResizingRect::West:
-						case eResizingRect::East:
+						case eResizingDirection::West:
+						case eResizingDirection::East:
 							SetCursor(LoadCursor(nullptr, IDC_SIZEWE));
 							break;
-						case eResizingRect::None:
+						case eResizingDirection::None:
 							SetCursor(LoadCursor(nullptr, IDC_SIZEALL));
 							break;
 						default:
-							__debugbreak();
+							assert(false);
 							break;
 						}
 					}
@@ -634,17 +786,15 @@ namespace canvas
 					SetCursor(LoadCursor(nullptr, IDC_CROSS));
 					break;
 				default:
-					__debugbreak();
+					assert(false);
 					break;
 				}
 			}
 			break;
 		case WM_LBUTTONUP:
-			if (!mbLButtonDown)
-			{
-				__debugbreak();
-			}
-
+#ifdef _DEBUG
+			DEBUG_BREAK(mbLButtonDown);
+#endif
 			switch (mCurrMode)
 			{
 			case eMouseMode::Select:
@@ -665,7 +815,7 @@ namespace canvas
 			case eMouseMode::Resize:
 				mCurrMode = eMouseMode::Selected;
 				mSelectedResizingRect = nullptr;
-				mSelectedResizingRectDirection = eResizingRect::None;
+				mResizingDirection = eResizingDirection::None;
 				break;
 			case eMouseMode::Rect:
 				mInstance->addSelectedObject();
@@ -675,7 +825,7 @@ namespace canvas
 				mCurrMode = eMouseMode::Select;
 				break;
 			default:
-				__debugbreak();
+				assert(false);
 				break;
 			}
 
@@ -698,7 +848,7 @@ namespace canvas
 			{
 				mInstance->removeSelectedObject();
 
-				SET_NONE_RECT(mSelectedObjectsArea);
+				SET_NONE_RECT(mSelectedBoundary);
 				mCurrMode = eMouseMode::Select;
 			}
 			break;
