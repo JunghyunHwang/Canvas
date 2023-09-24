@@ -42,7 +42,7 @@ namespace canvas
 		static D2D1_POINT_2F mEndPoint;
 		static eMouseMode mCurrMode;
 
-		static std::unordered_set<Object*> mObjects; 
+		static std::unordered_set<Object*> mObjects;
 		static std::unordered_set<Object*> mSelectedObjects;
 
 		static Object* mDragSelectionArea;
@@ -62,43 +62,72 @@ namespace canvas
 
 	inline void App::setResizingRectsPoint()
 	{
-		if (mSelectedBoundary->mLeftTop.x == NONE_POINT)
+		if (mSelectedBoundary->mRect.left == NONE_POINT)
 		{
 			return;
 		}
 
-		const D2D1_POINT_2F& LEFT_TOP = mSelectedBoundary->mLeftTop;
-		const D2D1_POINT_2F& RIGHT_BOTTOM = mSelectedBoundary->mRightBottom;
-		const float WIDTH = RIGHT_BOTTOM.x - LEFT_TOP.x;
-		const float HEIGHT = RIGHT_BOTTOM.y - LEFT_TOP.y;
-		const float CENTER_TO_WIDTH = RIGHT_BOTTOM.x - WIDTH / 2;
-		const float CENTER_TO_HEGIHT = RIGHT_BOTTOM.y - HEIGHT / 2;
+		const D2D1_POINT_2F LEFT_TOP = { mSelectedBoundary->mRect.left, mSelectedBoundary->mRect.top };
+		const D2D1_POINT_2F RIGHT_BOTTOM = { mSelectedBoundary->mRect.right, mSelectedBoundary->mRect.bottom };
+		const D2D1_POINT_2F CENTER = mSelectedBoundary->GetCenter();
+		
+		mResizingRects[static_cast<int>(eResizingDirection::NorthWest)]->mRect = { 
+			LEFT_TOP.x - RESIZING_RECT_SIZE,
+			LEFT_TOP.y - RESIZING_RECT_SIZE,
+			LEFT_TOP.x + RESIZING_RECT_SIZE,
+			LEFT_TOP.y + RESIZING_RECT_SIZE
+		};
 
-		mResizingRects[static_cast<int>(eResizingDirection::NorthWest)]->mLeftTop = {LEFT_TOP.x - RESIZING_RECT_SIZE, LEFT_TOP.y - RESIZING_RECT_SIZE};
-		mResizingRects[static_cast<int>(eResizingDirection::NorthWest)]->mRightBottom = { LEFT_TOP.x + RESIZING_RECT_SIZE, LEFT_TOP.y + RESIZING_RECT_SIZE };
+		mResizingRects[static_cast<int>(eResizingDirection::NorthEast)]->mRect = {
+			RIGHT_BOTTOM.x - RESIZING_RECT_SIZE,
+			LEFT_TOP.y - RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.x + RESIZING_RECT_SIZE,
+			LEFT_TOP.y + RESIZING_RECT_SIZE
+		};
 
-		mResizingRects[static_cast<int>(eResizingDirection::NorthEast)]->mLeftTop = { RIGHT_BOTTOM.x - RESIZING_RECT_SIZE, LEFT_TOP.y - RESIZING_RECT_SIZE };
-		mResizingRects[static_cast<int>(eResizingDirection::NorthEast)]->mRightBottom = { RIGHT_BOTTOM.x + RESIZING_RECT_SIZE, LEFT_TOP.y + RESIZING_RECT_SIZE };
+		mResizingRects[static_cast<int>(eResizingDirection::SouthWest)]->mRect = {
+			LEFT_TOP.x - RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.y - RESIZING_RECT_SIZE,
+			LEFT_TOP.x + RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.y + RESIZING_RECT_SIZE
+		};
 
-		mResizingRects[static_cast<int>(eResizingDirection::SouthWest)]->mLeftTop = { LEFT_TOP.x - RESIZING_RECT_SIZE, RIGHT_BOTTOM.y - RESIZING_RECT_SIZE };
-		mResizingRects[static_cast<int>(eResizingDirection::SouthWest)]->mRightBottom = { LEFT_TOP.x + RESIZING_RECT_SIZE, RIGHT_BOTTOM.y + RESIZING_RECT_SIZE };
-
-		mResizingRects[static_cast<int>(eResizingDirection::SouthEast)]->mLeftTop = { RIGHT_BOTTOM.x - RESIZING_RECT_SIZE, RIGHT_BOTTOM.y - RESIZING_RECT_SIZE };
-		mResizingRects[static_cast<int>(eResizingDirection::SouthEast)]->mRightBottom = { RIGHT_BOTTOM.x + RESIZING_RECT_SIZE, RIGHT_BOTTOM.y + RESIZING_RECT_SIZE };
+		mResizingRects[static_cast<int>(eResizingDirection::SouthEast)]->mRect = {
+			RIGHT_BOTTOM.x - RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.y - RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.x + RESIZING_RECT_SIZE,
+			RIGHT_BOTTOM.y + RESIZING_RECT_SIZE
+		};
 
 		if (mSelectedObjects.size() == 1)
 		{
-			mResizingRects[static_cast<int>(eResizingDirection::North)]->mLeftTop = { CENTER_TO_WIDTH - RESIZING_RECT_SIZE, LEFT_TOP.y - RESIZING_RECT_SIZE };
-			mResizingRects[static_cast<int>(eResizingDirection::North)]->mRightBottom = { CENTER_TO_WIDTH + RESIZING_RECT_SIZE, LEFT_TOP.y + RESIZING_RECT_SIZE };
+			mResizingRects[static_cast<int>(eResizingDirection::North)]->mRect = {
+				CENTER.x - RESIZING_RECT_SIZE,
+				LEFT_TOP.y - RESIZING_RECT_SIZE,
+				CENTER.x + RESIZING_RECT_SIZE,
+				LEFT_TOP.y + RESIZING_RECT_SIZE
+			};
 
-			mResizingRects[static_cast<int>(eResizingDirection::West)]->mLeftTop = { LEFT_TOP.x - RESIZING_RECT_SIZE, CENTER_TO_HEGIHT - RESIZING_RECT_SIZE };
-			mResizingRects[static_cast<int>(eResizingDirection::West)]->mRightBottom = { LEFT_TOP.x + RESIZING_RECT_SIZE, CENTER_TO_HEGIHT + RESIZING_RECT_SIZE };
+			mResizingRects[static_cast<int>(eResizingDirection::West)]->mRect = {
+				LEFT_TOP.x - RESIZING_RECT_SIZE,
+				CENTER.y - RESIZING_RECT_SIZE,
+				LEFT_TOP.x + RESIZING_RECT_SIZE,
+				CENTER.y + RESIZING_RECT_SIZE
+			};
 
-			mResizingRects[static_cast<int>(eResizingDirection::East)]->mLeftTop = { RIGHT_BOTTOM.x - RESIZING_RECT_SIZE, CENTER_TO_HEGIHT - RESIZING_RECT_SIZE };
-			mResizingRects[static_cast<int>(eResizingDirection::East)]->mRightBottom = { RIGHT_BOTTOM.x + RESIZING_RECT_SIZE, CENTER_TO_HEGIHT + RESIZING_RECT_SIZE };
+			mResizingRects[static_cast<int>(eResizingDirection::East)]->mRect = {
+				RIGHT_BOTTOM.x - RESIZING_RECT_SIZE,
+				CENTER.y - RESIZING_RECT_SIZE,
+				RIGHT_BOTTOM.x + RESIZING_RECT_SIZE,
+				CENTER.y + RESIZING_RECT_SIZE
+			};
 
-			mResizingRects[static_cast<int>(eResizingDirection::South)]->mLeftTop = { CENTER_TO_WIDTH - RESIZING_RECT_SIZE, RIGHT_BOTTOM.y - RESIZING_RECT_SIZE };
-			mResizingRects[static_cast<int>(eResizingDirection::South)]->mRightBottom = { CENTER_TO_WIDTH + RESIZING_RECT_SIZE, RIGHT_BOTTOM.y + RESIZING_RECT_SIZE };
+			mResizingRects[static_cast<int>(eResizingDirection::South)]->mRect = {
+				CENTER.x - RESIZING_RECT_SIZE,
+				RIGHT_BOTTOM.y - RESIZING_RECT_SIZE,
+				CENTER.x + RESIZING_RECT_SIZE,
+				RIGHT_BOTTOM.y + RESIZING_RECT_SIZE
+			};
 		}
 		else
 		{

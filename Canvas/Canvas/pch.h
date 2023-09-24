@@ -24,3 +24,4 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define MAX_LOADSTRING 100
 
 #include "CanvasHelper.h"
+#include "resource.h"
