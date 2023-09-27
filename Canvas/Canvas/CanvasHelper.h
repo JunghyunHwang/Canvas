@@ -6,7 +6,7 @@
 #define NONE_POINT (-10.f)
 #define RESIZING_RECTS_COUNT (8)
 #define RESIZING_RECT_SIZE (4)
-#define DEFAULT_STROKE_WIDTH (2)
+#define DEFAULT_STROKE_WIDTH (1)
 
 #define PRESSED(key) ((key) & 0x8000)
 
@@ -50,6 +50,15 @@ enum class eResizingDirection
 	SouthEast,
 
 	None
+};
+
+struct ObjectInfo
+{
+	float width;
+	float height;
+	D2D1_COLOR_F lineColor;
+	D2D1_COLOR_F backgroundColor;
+	float strokeWidth;
 };
 
 template<typename Interface>

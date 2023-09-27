@@ -20,6 +20,7 @@ namespace canvas
 
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
+	std::vector<ObjectInfo> App::mCopiedObjectSizes;
 
 	App::App()
 		: mHwnd(nullptr)
@@ -30,6 +31,7 @@ namespace canvas
 	{
 		mObjects.reserve(DEFAULT_OBJECT_CAPACITY);
 		mSelectedObjects.reserve(DEFAULT_OBJECT_CAPACITY);
+		mCopiedObjectSizes.reserve(DEFAULT_OBJECT_CAPACITY);
 	}
 
 	void App::discardDeviceResources()
@@ -90,13 +92,13 @@ namespace canvas
 			hr = createDeviceResources();
 		}
 
-		mDragSelectionArea = new Object(D2D1::ColorF(0.f, 0.f, 0.f, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
-		mSelectedBoundary = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0xFFFFFF, 0.f), 1.f);
-		mNewObjectArea = new Object();
+		mDragSelectionArea = new Object(D2D1::ColorF(0x000000, 0.3f), D2D1::ColorF(0x6495ED, 0.2f));
+		mSelectedBoundary = new Object(D2D1::ColorF(0x0000FF, 1.f), D2D1::ColorF(0xFFFFFF, 0.f));
+		mNewObjectArea = new Object(D2D1::ColorF(0x000000, 1.f), D2D1::ColorF(0xFFFFFF, 0.f));
 
 		for (size_t i = 0; i < RESIZING_RECTS_COUNT; ++i)
 		{
-			mResizingRects[i] = new Object(D2D1::ColorF::Blue, D2D1::ColorF(0xFFFFFF, 1.f), 1.f);
+			mResizingRects[i] = new Object(D2D1::ColorF(0x0000FF, 1.f), D2D1::ColorF(0xFFFFFF, 1.0f));
 		}
 
 		return hr;
@@ -177,7 +179,7 @@ namespace canvas
 		return mRenderTarget->EndDraw();
 	}
 
-	void App::addSelectedObject() 
+	void App::addObject() 
 	{
 		if (mStartPoint.x > mEndPoint.x)
 		{
@@ -194,10 +196,45 @@ namespace canvas
 		}
 
 		D2D1_RECT_F rect{ mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y };
-		mObjects.insert(new Object(rect, D2D1::ColorF::Black, D2D1::ColorF(0, 0, 0, 0)));
+		mObjects.insert(new Object(rect, D2D1::ColorF(0x000000, 1.f), D2D1::ColorF(0xFFFFFF, 0.f), 1.0f));
 	}
 
-	void App::removeSelectedObject()
+	void App::addCopiedObjectOnCursor(int x, int y)
+	{
+		if (mCopiedObjectSizes.size() == 1)
+		{
+			D2D1_RECT_F rect {
+				x - mCopiedObjectSizes[0].width / 2,
+				y - mCopiedObjectSizes[0].height / 2,
+				x + mCopiedObjectSizes[0].width / 2,
+				y + mCopiedObjectSizes[0].height / 2
+			};
+
+			mObjects.insert(new Object(rect, mCopiedObjectSizes[0].lineColor, mCopiedObjectSizes[0].backgroundColor, mCopiedObjectSizes[0].strokeWidth));
+		}
+	}
+
+	void App::duplicateSelectedObject()
+	{
+		if (mSelectedObjects.size() == 1)
+		{
+			auto obj = mSelectedObjects.begin();
+			
+			Object* newObj = new Object(**obj);
+			newObj->Move(OBJECT_MARGIN, OBJECT_MARGIN);
+
+			mObjects.insert(newObj);
+
+			D2D1_RECT_F rect = newObj->mRect;
+			ADD_MARGIN_TO_RECT(rect, SELECTED_RECT_MARGIN);
+			mSelectedBoundary->SetRect(rect);
+
+			mSelectedObjects.clear();
+			mSelectedObjects.insert(newObj);
+		}
+	}
+
+	void App::removeSelectedObjects()
 	{
 		for (auto obj : mSelectedObjects)
 		{
@@ -209,9 +246,26 @@ namespace canvas
 #endif
 
 			delete obj;
+			obj = nullptr;
 		}
 
 		mSelectedObjects.clear();
+	}
+
+	void App::copySelectedObjects()
+	{
+		mCopiedObjectSizes.clear();
+
+		for (auto obj : mSelectedObjects)
+		{
+			mCopiedObjectSizes.push_back({ 
+				obj->GetWidth(),
+				obj->GetHeight(),
+				obj->mLineColor,
+				obj->mBackgroundColor,
+				obj->mStrokeWidth
+			});
+		}
 	}
 
 	Object* App::getObjectOnCursor(float x, float y)
@@ -419,6 +473,8 @@ namespace canvas
 
 	LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
+		static KeyManager* keyManager = KeyManager::GetInstance();
+
 		switch (message)
 		{
 		case WM_DESTROY:
@@ -803,7 +859,7 @@ namespace canvas
 				mResizingDirection = eResizingDirection::None;
 				break;
 			case eMouseMode::Rect:
-				mInstance->addSelectedObject();
+				mInstance->addObject();
 
 				SET_NONE_RECT(mNewObjectArea);
 
@@ -819,30 +875,60 @@ namespace canvas
 			mEndPoint.y = NONE_POINT;
 			break;
 		case WM_KEYDOWN:
-			if (PRESSED(GetAsyncKeyState('1')))
+			keyManager->Update();
+
+			if (keyManager->IsKeyPressed(eKeyValue::Select))
 			{
 				mCurrMode = eMouseMode::Select;
 				SetCursor(LoadCursor(nullptr, IDC_ARROW));
 			}
-			else if (PRESSED(GetAsyncKeyState('2')))
+			else if (keyManager->IsKeyPressed(eKeyValue::Rect))
 			{
 				mCurrMode = eMouseMode::Rect;
 				SetCursor(LoadCursor(nullptr, IDC_CROSS));
 			}
-			else if (PRESSED(GetAsyncKeyState('D')) || wParam == VK_BACK)
+			else if (keyManager->IsKeyPressed(eKeyValue::Backspace))
 			{
-				mInstance->removeSelectedObject();
+				mInstance->removeSelectedObjects();
 
 				SET_NONE_RECT(mSelectedBoundary);
 				mCurrMode = eMouseMode::Select;
+
+				goto call_render;
 			}
-			break;
+			else if (keyManager->IsKeyPressed(eKeyValue::C) && keyManager->IsKeyPressed(eKeyValue::Ctrl))
+			{
+				mInstance->copySelectedObjects();
+			}
+			else if (keyManager->IsKeyPressed(eKeyValue::V) && keyManager->IsKeyPressed(eKeyValue::Ctrl))
+			{
+				POINT cursorPoint = { 0, 0 };
+				GetCursorPos(&cursorPoint);
+				ScreenToClient(mInstance->mHwnd, &cursorPoint);
+
+				mInstance->addCopiedObjectOnCursor(cursorPoint.x, cursorPoint.y);
+
+				goto call_render;
+			}
+			else if (keyManager->IsKeyPressed(eKeyValue::D) && keyManager->IsKeyPressed(eKeyValue::Ctrl))
+			{
+				mInstance->duplicateSelectedObject();
+				goto call_render;
+			}
+
+			goto no_render;
+		case WM_KEYUP:
+			keyManager->Update();
+
+			goto no_render;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 
+	call_render:
 		mInstance->render();
 
+	no_render:
 		return 0;
 	}
 }

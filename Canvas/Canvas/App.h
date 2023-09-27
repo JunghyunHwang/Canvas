@@ -1,10 +1,11 @@
 #pragma once
 
 #include "Object.h"
+#include "KeyManager.h"
 
 namespace canvas
 {
-	class App
+	class App final
 	{
 	public:
 		static App* GetInstance();
@@ -20,13 +21,17 @@ namespace canvas
 		App(const App* other) = delete;
 		App& operator=(const App* rhs) = delete;
 
+	private:
 		HRESULT createDeviceResources();
 		void discardDeviceResources();
 
 		HRESULT render();
-
-		void addSelectedObject();
-		void removeSelectedObject();
+		
+		void addObject();
+		void addCopiedObjectOnCursor(int x, int y);
+		void duplicateSelectedObject();
+		void removeSelectedObjects();
+		void copySelectedObjects();
 		void moveSelectedObjects(float x, float y);
 		Object* getObjectOnCursor(float x, float y);
 		int getSelectedObjectsBoundary(D2D1_RECT_F& out);
@@ -44,6 +49,7 @@ namespace canvas
 
 		static std::unordered_set<Object*> mObjects;
 		static std::unordered_set<Object*> mSelectedObjects;
+		static std::vector<ObjectInfo> mCopiedObjectSizes;
 
 		static Object* mDragSelectionArea;
 		static Object* mSelectedBoundary;

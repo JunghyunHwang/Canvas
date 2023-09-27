@@ -8,11 +8,8 @@ namespace canvas
 	{
 		friend App;
 	public:
-		Object();
-		Object(D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
-		Object(D2D1::ColorF lineColor, D2D1::ColorF backgroundColor, float strokeWidth);
-		Object(D2D1_RECT_F& rect, D2D1::ColorF lineColor, D2D1::ColorF backgroundColor);
-		Object(D2D1_RECT_F& rect, D2D1::ColorF lineColor, D2D1::ColorF backgroundColor, float strokeWidth);
+		Object(D2D1_COLOR_F lineColor, D2D1_COLOR_F backgroundColor, float strokeWidth = 1.f);
+		Object(D2D1_RECT_F rect, D2D1_COLOR_F lineColor, D2D1_COLOR_F backgroundColor, float strokeWidth = 1.f);
 
 		~Object() = default;
 		Object(const Object& other) = default;
@@ -32,9 +29,8 @@ namespace canvas
 
 	private:
 		D2D1_RECT_F mRect;
-		
-		D2D1::ColorF mLineColor;
-		D2D1::ColorF mBackgroundColor;
+		D2D1_COLOR_F mLineColor;
+		D2D1_COLOR_F mBackgroundColor;
 		float mStrokeWidth;
 	};
 
