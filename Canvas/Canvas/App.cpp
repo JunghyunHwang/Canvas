@@ -20,7 +20,7 @@ namespace canvas
 
 	std::unordered_set<Object*> App::mObjects;
 	std::unordered_set<Object*> App::mSelectedObjects;
-	std::vector<ObjectInfo> App::mCopiedObjectSizes;
+	std::vector<ObjectInfo> App::mCopiedObjectInfo;
 
 	App::App()
 		: mHwnd(nullptr)
@@ -31,7 +31,7 @@ namespace canvas
 	{
 		mObjects.reserve(DEFAULT_OBJECT_CAPACITY);
 		mSelectedObjects.reserve(DEFAULT_OBJECT_CAPACITY);
-		mCopiedObjectSizes.reserve(DEFAULT_OBJECT_CAPACITY);
+		mCopiedObjectInfo.reserve(DEFAULT_OBJECT_CAPACITY);
 	}
 
 	void App::discardDeviceResources()
@@ -199,39 +199,63 @@ namespace canvas
 		mObjects.insert(new Object(rect, D2D1::ColorF(0x000000, 1.f), D2D1::ColorF(0xFFFFFF, 0.f), 1.0f));
 	}
 
-	void App::addCopiedObjectOnCursor(int x, int y)
+	void App::copySelectedObjects()
 	{
-		if (mCopiedObjectSizes.size() == 1)
-		{
-			D2D1_RECT_F rect {
-				x - mCopiedObjectSizes[0].width / 2,
-				y - mCopiedObjectSizes[0].height / 2,
-				x + mCopiedObjectSizes[0].width / 2,
-				y + mCopiedObjectSizes[0].height / 2
-			};
+		mCopiedObjectInfo.clear();
 
-			mObjects.insert(new Object(rect, mCopiedObjectSizes[0].lineColor, mCopiedObjectSizes[0].backgroundColor, mCopiedObjectSizes[0].strokeWidth));
+		auto center = mSelectedBoundary->GetCenter();
+
+		for (auto& obj : mSelectedObjects)
+		{
+			mCopiedObjectInfo.push_back({
+				obj->mRect.left - center.x,
+				obj->mRect.top - center.y,
+				obj->GetWidth(),
+				obj->GetHeight(),
+				obj->mLineColor,
+				obj->mBackgroundColor,
+				obj->mStrokeWidth
+			});
 		}
 	}
 
+	void App::addCopiedObjectOnCursor(int x, int y)
+	{
+		mSelectedObjects.clear();
+
+		for (const auto& info : mCopiedObjectInfo)
+		{
+			const float LEFT = x + info.leftFromCenter;
+			const float TOP = y + info.topFromCenter;
+
+			D2D1_RECT_F rect{ LEFT, TOP, LEFT + info.width, TOP + info.height };
+
+			Object* copiedObject = new Object(rect, info.lineColor, info.backgroundColor, info.strokeWidth);
+			mObjects.insert(copiedObject);
+			mSelectedObjects.insert(copiedObject);
+		}
+
+		getSelectedObjectsBoundary(mSelectedBoundary->mRect);
+	}
+	
 	void App::duplicateSelectedObject()
 	{
-		if (mSelectedObjects.size() == 1)
+		std::vector<Object*> duplicatedObjects;
+		duplicatedObjects.reserve(mSelectedObjects.size());
+
+		for (auto obj : mSelectedObjects)
 		{
-			auto obj = mSelectedObjects.begin();
-			
-			Object* newObj = new Object(**obj);
-			newObj->Move(OBJECT_MARGIN, OBJECT_MARGIN);
+			Object* duplicated = new Object(*obj);
+			duplicated->Move(OBJECT_MARGIN, OBJECT_MARGIN);
 
-			mObjects.insert(newObj);
-
-			D2D1_RECT_F rect = newObj->mRect;
-			ADD_MARGIN_TO_RECT(rect, SELECTED_RECT_MARGIN);
-			mSelectedBoundary->SetRect(rect);
-
-			mSelectedObjects.clear();
-			mSelectedObjects.insert(newObj);
+			mObjects.insert(duplicated);
+			duplicatedObjects.push_back(duplicated);
 		}
+
+		mSelectedObjects.clear();
+		mSelectedObjects.insert(duplicatedObjects.begin(), duplicatedObjects.end());
+
+		getSelectedObjectsBoundary(mSelectedBoundary->mRect);
 	}
 
 	void App::removeSelectedObjects()
@@ -250,22 +274,6 @@ namespace canvas
 		}
 
 		mSelectedObjects.clear();
-	}
-
-	void App::copySelectedObjects()
-	{
-		mCopiedObjectSizes.clear();
-
-		for (auto obj : mSelectedObjects)
-		{
-			mCopiedObjectSizes.push_back({ 
-				obj->GetWidth(),
-				obj->GetHeight(),
-				obj->mLineColor,
-				obj->mBackgroundColor,
-				obj->mStrokeWidth
-			});
-		}
 	}
 
 	Object* App::getObjectOnCursor(float x, float y)
@@ -337,7 +345,7 @@ namespace canvas
 		return result;
 	}
 
-	int App::getSelectedObjectsBoundary(D2D1_RECT_F& out)
+	void App::addObjectsInDraggingArea()
 	{
 		D2D1_RECT_F dragSelectionArea = { mStartPoint.x, mStartPoint.y, mEndPoint.x, mEndPoint.y };
 
@@ -353,28 +361,12 @@ namespace canvas
 			dragSelectionArea.bottom = mStartPoint.y;
 		}
 
-		float minLeft = static_cast<float>(mResolution.x) + 1;
-		float minTop = static_cast<float>(mResolution.y) + 1;
-		float maxRight = -1.f;
-		float maxBottom = -1.f;
-		int result = 0;
-		
 		for (auto obj : mObjects)
 		{
 			if (obj->mRect.left >= dragSelectionArea.left && obj->mRect.right <= dragSelectionArea.right
 				&& obj->mRect.top >= dragSelectionArea.top && obj->mRect.bottom <= dragSelectionArea.bottom)
 			{
 				auto ret = mSelectedObjects.insert(obj);
-
-				if (ret.second)
-				{
-					++result;
-				}
-
-				minLeft = minLeft > obj->mRect.left ? obj->mRect.left : minLeft;
-				minTop = minTop > obj->mRect.top ? obj->mRect.top : minTop;
-				maxRight = maxRight < obj->mRect.right ? obj->mRect.right: maxRight;
-				maxBottom = maxBottom < obj->mRect.bottom ? obj->mRect.bottom : maxBottom;
 			}
 			else
 			{
@@ -384,25 +376,37 @@ namespace canvas
 				}
 			}
 		}
+	}
 
-		if (maxRight == -1.f)
+	void App::getSelectedObjectsBoundary(D2D1_RECT_F& outBoundary)
+	{
+		outBoundary = { 
+			static_cast<float>(mResolution.x) + 1,
+			static_cast<float>(mResolution.y) + 1,
+			NONE_POINT,
+			NONE_POINT
+		};
+		
+		for (auto obj : mSelectedObjects)
 		{
-			DEBUG_BREAK(maxBottom == -1.f);
-
-			out.left = NONE_POINT;
-			out.top = NONE_POINT;
-			out.right = NONE_POINT;
-			out.bottom = NONE_POINT;
+			outBoundary.left = outBoundary.left > obj->mRect.left ? obj->mRect.left : outBoundary.left;
+			outBoundary.top = outBoundary.top > obj->mRect.top ? obj->mRect.top : outBoundary.top;
+			outBoundary.right = outBoundary.right < obj->mRect.right ? obj->mRect.right : outBoundary.right;
+			outBoundary.bottom = outBoundary.bottom < obj->mRect.bottom ? obj->mRect.bottom : outBoundary.bottom;
 		}
-		else
+
+		if (outBoundary.right == NONE_POINT)
 		{
-			out.left = minLeft;
-			out.top = minTop;
-			out.right = maxRight;
-			out.bottom = maxBottom;
+			DEBUG_BREAK(outBoundary.bottom == NONE_POINT);
+			DEBUG_BREAK(mSelectedObjects.size() == 0);
+
+			outBoundary.left = NONE_POINT;
+			outBoundary.top = NONE_POINT;
+
+			return;
 		}
 
-		return result;
+		ADD_MARGIN_TO_RECT(outBoundary, SELECTED_RECT_MARGIN);
 	}
 
 	void App::getResizeRect(D2D1_RECT_F& out)
@@ -586,11 +590,9 @@ namespace canvas
 					mDragSelectionArea->SetLeftTop(mStartPoint);
 					mDragSelectionArea->SetRightBottom(mEndPoint);
 
-					D2D1_RECT_F selectedBoundary;
-					mInstance->getSelectedObjectsBoundary(selectedBoundary);
+					mInstance->addObjectsInDraggingArea();
 
-					ADD_MARGIN_TO_RECT(selectedBoundary, SELECTED_RECT_MARGIN);
-					mSelectedBoundary->SetRect(selectedBoundary);
+					mInstance->getSelectedObjectsBoundary(mSelectedBoundary->mRect);
 					break;
 				case eMouseMode::Selected:
 					SetCursor(LoadCursor(nullptr, IDC_SIZEALL));

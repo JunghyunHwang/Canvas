@@ -34,7 +34,8 @@ namespace canvas
 		void copySelectedObjects();
 		void moveSelectedObjects(float x, float y);
 		Object* getObjectOnCursor(float x, float y);
-		int getSelectedObjectsBoundary(D2D1_RECT_F& out);
+		void addObjectsInDraggingArea();
+		void getSelectedObjectsBoundary(D2D1_RECT_F& out);
 		void getResizeRect(D2D1_RECT_F& out);
 		
 		inline void setResizingRectsPoint();
@@ -49,7 +50,7 @@ namespace canvas
 
 		static std::unordered_set<Object*> mObjects;
 		static std::unordered_set<Object*> mSelectedObjects;
-		static std::vector<ObjectInfo> mCopiedObjectSizes;
+		static std::vector<ObjectInfo> mCopiedObjectInfo;
 
 		static Object* mDragSelectionArea;
 		static Object* mSelectedBoundary;
@@ -57,7 +58,7 @@ namespace canvas
 		static eResizingDirection mResizingDirection;
 		static Object* mNewObjectArea;
 		static Object* mResizingRects[RESIZING_RECTS_COUNT];
-
+		
 		HWND mHwnd;
 		POINT mResolution;
 

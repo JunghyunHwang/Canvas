@@ -54,6 +54,8 @@ enum class eResizingDirection
 
 struct ObjectInfo
 {
+	float leftFromCenter;
+	float topFromCenter;
 	float width;
 	float height;
 	D2D1_COLOR_F lineColor;
